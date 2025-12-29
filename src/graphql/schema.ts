@@ -2,10 +2,12 @@ export const typeDefs = /* GraphQL */ `
   type User {
     id: ID!
     email: String!
+    googleId: String
     whatsappNumber: String
     isSubscribed: Boolean!
     subscriptionEnd: String
     projects: [Project!]!
+    reviews: [Review!]!
   }
 
   type Project {
@@ -25,6 +27,26 @@ export const typeDefs = /* GraphQL */ `
     status: String!
   }
 
+  type Review {
+    id: ID!
+    userId: String!
+    projectId: String
+    targetUserId: String
+    rating: Int!
+    comment: String
+  }
+
+  input ProjectInput {
+    title: String!
+    description: String
+    cloudinaryUrl: String
+  }
+
+  type AuthResponse {
+    token: String!
+    user: User!
+  }
+
   type Query {
     project(publicCode: Int!): Project
     me: User
@@ -34,5 +56,8 @@ export const typeDefs = /* GraphQL */ `
   type Mutation {
     subscribe(receiptUrl: String!): Subscription!
     followUser(followingId: ID!): Boolean!
+    createProject(input: ProjectInput!): Project!
+    updateProfile(whatsappNumber: String!): User!
+    authGoogle(idToken: String!): AuthResponse!
   }
 `;

@@ -1,13 +1,15 @@
 import { Hono } from "hono";
 import { createYoga, createSchema } from "graphql-yoga";
 import { drizzle } from "drizzle-orm/d1";
-import { jwt } from "hono/jwt";
+import { verify } from "hono/jwt";
 import { typeDefs } from "./graphql/schema";
 import { resolvers } from "./graphql/resolvers";
 
 type Bindings = {
     DB: D1Database;
     JWT_SECRET: string;
+    GOOGLE_CLIENT_ID: string;
+    GOOGLE_CLIENT_SECRET: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -32,15 +34,14 @@ const yoga = createYoga<{
 
 // JWT Middleware
 // We use a permissive JWT middleware that doesn't block but injects user info if available
-// For real-world, you might want separate routes or strict middleware for mutations.
 app.use("/graphql", async (c: any, next: any) => {
     const authHeader = c.req.header("Authorization");
-    if (authHeader) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
         try {
-            const middleware = jwt({
-                secret: c.env.JWT_SECRET,
-            });
-            return await middleware(c, next);
+            const secret = c.env.JWT_SECRET || "amroamro";
+            const payload = await verify(token, secret);
+            c.set("jwtPayload", payload);
         } catch (e) {
             // If invalid token, we still proceed but without user context
             console.error("JWT Verification failed", e);

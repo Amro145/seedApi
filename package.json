@@ -4,9 +4,9 @@
     "main": "src/index.ts",
     "scripts": {
         "dev": "wrangler dev",
-        "deploy": "wrangler deploy --remote",
+        "deploy": "npx wrangler deploy --remote",
         "db:generate": "drizzle-kit generate",
-        "db:migrate": "wrangler d1 migrations apply seedseed_db --remote"
+        "db:migrate": "npx wrangler d1 migrations apply seedseed_db --remote"
     },
     "dependencies": {
         "cloudinary": "^2.5.1",
