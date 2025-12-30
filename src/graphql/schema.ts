@@ -2,7 +2,8 @@ export const typeDefs = /* GraphQL */ `
   type User {
     id: ID!
     email: String!
-    googleId: String
+    name: String
+    image: String
     whatsappNumber: String
     isSubscribed: Boolean!
     subscriptionEnd: String
@@ -42,11 +43,6 @@ export const typeDefs = /* GraphQL */ `
     cloudinaryUrl: String
   }
 
-  type AuthResponse {
-    token: String!
-    user: User!
-  }
-
   type Query {
     project(publicCode: Int!): Project
     me: User
@@ -58,6 +54,5 @@ export const typeDefs = /* GraphQL */ `
     followUser(followingId: ID!): Boolean!
     createProject(input: ProjectInput!): Project!
     updateProfile(whatsappNumber: String!): User!
-    authGoogle(idToken: String!): AuthResponse!
   }
 `;

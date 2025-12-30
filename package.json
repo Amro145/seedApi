@@ -9,6 +9,8 @@
         "db:migrate": "npx wrangler d1 migrations apply seedseed_db --remote"
     },
     "dependencies": {
+        "@auth/core": "^0.41.1",
+        "@auth/drizzle-adapter": "^1.11.1",
         "cloudinary": "^2.5.1",
         "drizzle-orm": "^0.38.2",
         "graphql": "^16.9.0",
