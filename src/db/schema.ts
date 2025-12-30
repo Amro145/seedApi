@@ -55,6 +55,9 @@ export const projects = sqliteTable("projects", {
     description: text("description"),
     publicCode: integer("public_code").notNull().unique(),
     cloudinaryUrl: text("cloudinary_url"),
+    category: text("category"),
+    place: text("place"),
+    price: integer("price"),
 });
 
 export const subscriptions = sqliteTable("subscriptions", {

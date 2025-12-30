@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { users, projects, subscriptions, follows, reviews } from "../db/schema";
+import { eq, inArray, and, gte, lte } from "drizzle-orm";
+import { users, subscriptions, follows, reviews, projects } from "../db/schema";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcryptjs";
 import { sign } from "hono/jwt";
@@ -15,6 +15,41 @@ export const resolvers = {
         },
         users: async (_: any, __: any, { db }: any) => {
             return await db.select().from(users).all();
+        },
+        projects: async (_: any, { filter }: { filter?: any }, { db }: any) => {
+            const subscribedUsersList = await db.select().from(users).where(eq(users.isSubscribed, true)).all();
+            if (subscribedUsersList.length === 0) return [];
+
+            const ownerIds = subscribedUsersList.map((u: any) => u.id);
+
+            const conditions = [inArray(projects.ownerId, ownerIds)];
+
+            if (filter) {
+                if (filter.category) conditions.push(eq(projects.category, filter.category));
+                if (filter.place) conditions.push(eq(projects.place, filter.place));
+                if (filter.minPrice !== undefined) conditions.push(gte(projects.price, filter.minPrice));
+                if (filter.maxPrice !== undefined) conditions.push(lte(projects.price, filter.maxPrice));
+            }
+
+            const projectList = await db.select().from(projects).where(and(...conditions)).all();
+            return projectList;
+        },
+        pendingSubscriptions: async (_: any, __: any, { db, user }: any) => {
+            // ADMIN CHECK - Replace with your actual admin email
+            if (!user || user.email !== 'amrojawadi@gmail.com') {
+                throw new Error('Forbidden: Admins only');
+            }
+            return await db.select().from(subscriptions).where(eq(subscriptions.status, 'Pending')).all();
+        },
+        profile: async (_: any, { userId }: { userId: string }, { db }: any) => {
+            const user = await db.select().from(users).where(eq(users.id, userId)).get();
+            if (!user) throw new Error("User not found");
+            if (!user.isSubscribed) {
+                throw new Error("User is not subscribed");
+            }
+            const projectsList = await db.select().from(projects).where(eq(projects.ownerId, userId)).all();
+            user.projects = projectsList;
+            return user;
         },
     },
     Mutation: {
@@ -93,18 +128,31 @@ export const resolvers = {
             if (!user) throw new Error("Unauthorized");
 
             const id = uuidv4();
-            const publicCode = Math.floor(1000 + Math.random() * 9000);
+            let publicCode = Math.floor(1000 + Math.random() * 9000);
 
-            const [newProject] = await db.insert(projects).values({
+            const projectValues = {
                 id,
                 ownerId: user.id,
                 title: input.title,
                 description: input.description,
                 publicCode,
                 cloudinaryUrl: input.cloudinaryUrl,
-            }).returning();
+                category: input.category,
+                place: input.place,
+                price: input.price,
+            };
 
-            return newProject;
+            try {
+                const [newProject] = await db.insert(projects).values(projectValues).returning();
+                return newProject;
+            } catch (e: any) {
+                if (e.message?.includes("UNIQUE") || e.message?.includes("constraint")) {
+                    projectValues.publicCode = Math.floor(1000 + Math.random() * 9000);
+                    const [newProject] = await db.insert(projects).values(projectValues).returning();
+                    return newProject;
+                }
+                throw e;
+            }
         },
         updateProfile: async (_: any, { whatsappNumber }: { whatsappNumber: string }, { db, user }: any) => {
             if (!user) throw new Error("Unauthorized");
@@ -115,12 +163,46 @@ export const resolvers = {
                 .returning();
 
             return updatedUser;
-        }
+        },
+        ratingProject: async (_: any, { projectId, ratingValue }: { projectId: string, ratingValue: number }, { db, user }: any) => {
+            if (!user) throw new Error("Unauthorized");
+            const project = await db.select().from(projects).where(eq(projects.id, projectId)).get();
+            if (!project) throw new Error("Project not found");
+
+            const [rating] = await db.insert(reviews).values({
+                id: uuidv4(),
+                userId: user.id,
+                projectId,
+                rating: ratingValue,
+            }).returning();
+
+            return rating;
+        },
+        approveSubscription: async (_: any, { id, userId }: { id: string, userId: string }, { db, user }: any) => {
+            // ADMIN CHECK - Replace with your actual admin email
+            if (!user || user.email !== 'amrojawadi@gmail.com') {
+                throw new Error('Forbidden: Admins only');
+            }
+
+            // 1. Update subscription status
+            await db.update(subscriptions)
+                .set({ status: 'Approved' })
+                .where(and(eq(subscriptions.id, id), eq(subscriptions.userId, userId)))
+                .run();
+
+            // 2. Grant subscription to user
+            const [updatedUser] = await db.update(users)
+                .set({ isSubscribed: true })
+                .where(eq(users.id, userId))
+                .returning();
+
+            return updatedUser;
+        },
     },
     User: {
         whatsappNumber: (parent: any, _: any, { user }: any) => {
             if (!user || (!user.isSubscribed && parent.id !== user.id)) {
-                return "Locked - Subscribe to View";
+                return "Locked";
             }
             return parent.whatsappNumber;
         },

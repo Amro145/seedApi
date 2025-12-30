@@ -19,6 +19,9 @@ export const typeDefs = /* GraphQL */ `
     publicCode: Int!
     cloudinaryUrl: String
     owner: User!
+    category: String
+    place: String
+    price: Int
   }
 
   type Subscription {
@@ -41,12 +44,25 @@ export const typeDefs = /* GraphQL */ `
     title: String!
     description: String
     cloudinaryUrl: String
+    category: String
+    place: String
+    price: Int
+  }
+
+  input ProjectFilter {
+    category: String
+    place: String
+    minPrice: Int
+    maxPrice: Int
   }
 
   type Query {
     project(publicCode: Int!): Project
     me: User
     users: [User!]!
+    projects(filter: ProjectFilter): [Project!]!
+    pendingSubscriptions: [Subscription!]!
+    profile(userId: ID!): User
   }
 
   type AuthPayload {
@@ -62,5 +78,7 @@ export const typeDefs = /* GraphQL */ `
     login(email: String!, password: String!): AuthPayload!
     signUp(email: String!, password: String!): User!
     logout: Boolean!
+    approveSubscription(id: String!, userId: String!): User!
+    ratingProject(projectId: String!, ratingValue: Int!): Review!
   }
 `;
