@@ -15,6 +15,13 @@
       "when": 1767052736224,
       "tag": "0001_adorable_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1767054288496,
+      "tag": "0002_flashy_maria_hill",
+      "breakpoints": true
     }
   ]
 }

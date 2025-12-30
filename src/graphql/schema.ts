@@ -49,10 +49,18 @@ export const typeDefs = /* GraphQL */ `
     users: [User!]!
   }
 
+  type AuthPayload {
+    user: User!
+    token: String!
+  }
+
   type Mutation {
     subscribe(receiptUrl: String!): Subscription!
     followUser(followingId: ID!): Boolean!
     createProject(input: ProjectInput!): Project!
     updateProfile(whatsappNumber: String!): User!
+    login(email: String!, password: String!): AuthPayload!
+    signUp(email: String!, password: String!): User!
+    logout: Boolean!
   }
 `;

@@ -11,6 +11,7 @@
     "dependencies": {
         "@auth/core": "^0.41.1",
         "@auth/drizzle-adapter": "^1.11.1",
+        "bcryptjs": "^3.0.3",
         "cloudinary": "^2.5.1",
         "drizzle-orm": "^0.38.2",
         "graphql": "^16.9.0",
@@ -22,6 +23,7 @@
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20241224.0",
+        "@types/bcryptjs": "^2.4.6",
         "@types/uuid": "^10.0.0",
         "dotenv": "^17.2.3",
         "drizzle-kit": "^0.30.1",

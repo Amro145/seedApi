@@ -11,6 +11,7 @@ export const users = sqliteTable("user", {
     whatsappNumber: text("whatsapp_number"),
     isSubscribed: integer("is_subscribed", { mode: "boolean" }).default(false),
     subscriptionEnd: integer("subscription_end", { mode: "timestamp" }),
+    password: text("password"),
 });
 
 export const accounts = sqliteTable("account", {

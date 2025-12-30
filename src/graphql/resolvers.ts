@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { users, projects, subscriptions, follows, reviews } from "../db/schema";
 import { v4 as uuidv4 } from "uuid";
+import bcrypt from "bcryptjs";
+import { sign } from "hono/jwt";
 
 export const resolvers = {
     Query: {
@@ -16,9 +18,47 @@ export const resolvers = {
         },
     },
     Mutation: {
+        signUp: async (_: any, { email, password }: any, { db }: any) => {
+            const existing = await db.select().from(users).where(eq(users.email, email)).get();
+            if (existing) throw new Error("Email already exists");
+
+            const id = uuidv4();
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const [newUser] = await db.insert(users).values({
+                id,
+                email,
+                password: hashedPassword,
+                isSubscribed: false
+            }).returning();
+
+            return newUser;
+        },
+        login: async (_: any, { email, password }: any, { db, env }: any) => {
+            const user = await db.select().from(users).where(eq(users.email, email)).get();
+            if (!user) throw new Error("User not found");
+
+            if (!user.password) throw new Error("User does not have a password set (try Google login)");
+
+            const validPassword = await bcrypt.compare(password, user.password);
+            if (!validPassword) throw new Error("Invalid password");
+
+            const token = await sign({
+                id: user.id,
+                email: user.email,
+                isSubscribed: user.isSubscribed,
+                exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 // 1 week
+            }, env.JWT_SECRET || env.AUTH_SECRET || "secretKey");
+
+            return { user, token };
+        },
+        logout: async (_: any, __: any, { user }: any) => {
+            if (!user) throw new Error("Unauthorized");
+            return true;
+        },
         subscribe: async (_: any, { receiptUrl }: { receiptUrl: string }, { db, user }: any) => {
             if (!user) throw new Error("Unauthorized");
-            const id = crypto.randomUUID();
+            const id = uuidv4();
             const [newSub] = await db.insert(subscriptions).values({
                 id,
                 userId: user.id,

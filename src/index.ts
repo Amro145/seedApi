@@ -6,7 +6,12 @@ import { resolvers } from "./graphql/resolvers";
 import { cors } from "hono/cors";
 import { Auth } from "@auth/core";
 import Google from "@auth/core/providers/google";
+import Credentials from "@auth/core/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
+import { users } from "./db/schema";
+import { verify } from "hono/jwt";
 
 type Bindings = {
     DB: D1Database;
@@ -38,6 +43,30 @@ function getAuthConfig(env: Bindings): any {
                 clientId: env.GOOGLE_CLIENT_ID,
                 clientSecret: env.GOOGLE_CLIENT_SECRET,
             }),
+            Credentials({
+                credentials: {
+                    email: { label: "Email", type: "email" },
+                    password: { label: "Password", type: "password" }
+                },
+                async authorize(credentials) {
+                    if (!credentials?.email || !credentials?.password) return null;
+
+                    const user = await db.select().from(users).where(eq(users.email, credentials.email as string)).get();
+
+                    if (!user || !user.password) return null;
+
+                    const isValid = await bcrypt.compare(credentials.password as string, user.password);
+
+                    if (!isValid) return null;
+
+                    return {
+                        id: user.id,
+                        email: user.email,
+                        name: user.name,
+                        isSubscribed: user.isSubscribed
+                    };
+                }
+            })
         ],
         secret: env.AUTH_SECRET || env.JWT_SECRET || "amroamro",
         trustHost: true,
@@ -72,6 +101,7 @@ app.all("/api/auth/*", async (c) => {
 
 // Helper to get session user for GraphQL context
 async function getSessionUser(req: Request, env: Bindings) {
+    // 1. Try Auth.js session (Cookie based)
     const config = getAuthConfig(env);
     const url = new URL(req.url);
     url.pathname = "/api/auth/session";
@@ -79,8 +109,25 @@ async function getSessionUser(req: Request, env: Bindings) {
         headers: req.headers,
     });
     const sessionRes = await Auth(sessionReq, config) as Response;
-    const sessionData: any = await sessionRes.json();
-    return sessionData?.user || null;
+    if (sessionRes.ok) {
+        const sessionData: any = await sessionRes.json();
+        if (sessionData?.user) return sessionData.user;
+    }
+
+    // 2. Try Authorization Header (JWT based)
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        try {
+            const secret = env.JWT_SECRET || env.AUTH_SECRET || "amroamro";
+            const payload = await verify(token, secret);
+            return payload;
+        } catch (e) {
+            console.error("JWT Verification failed:", e);
+        }
+    }
+
+    return null;
 }
 
 // GraphQL Yoga Setup
@@ -97,6 +144,8 @@ const yoga = createYoga<{
         return { db, user, env: ctx.Bindings };
     },
     graphqlEndpoint: "/graphql",
+    maskedErrors: false,
+    logging: true,
 });
 
 app.all("/graphql", async (c) => yoga.handle(c.req.raw, { Bindings: c.env }));
